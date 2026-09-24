@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Plus, Shuffle, Trash2 } from "lucide-react";
+import { Plus, Shuffle, Trash2, Upload, Image as ImageIcon, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/browser";
 import { FormActions, ModuleHeader, Notice } from "@/components/crud-ui";
 import {
@@ -40,6 +40,11 @@ export function BusinessSettingsManager({ businessId, role }: { businessId: stri
   const supabase = useMemo(() => createClient(), []);
   const [form, setForm] = useState<F>(empty);
   const [provider, setProvider] = useState("manual");
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [faviconUrl, setFaviconUrl] = useState<string | null>(null);
+  const [useLogoAsFavicon, setUseLogoAsFavicon] = useState(true);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [uploadingFavicon, setUploadingFavicon] = useState(false);
   const [autoReminder, setAutoReminder] = useState(false);
   const [motivationEnabled, setMotivationEnabled] = useState(true);
   const [quotes, setQuotes] = useState<string[]>([...DEFAULT_DASHBOARD_QUOTES]);
@@ -52,17 +57,18 @@ export function BusinessSettingsManager({ businessId, role }: { businessId: stri
       const [{ data: b }, { data: s }] = await Promise.all([
         supabase
           .from("businesses")
-          .select("name,address,whatsapp,email,timezone,currency,invoice_prefix,order_prefix,sku_prefix")
+          .select("name,address,whatsapp,email,timezone,currency,invoice_prefix,order_prefix,sku_prefix,logo_url")
           .eq("id", businessId)
           .single(),
         supabase
           .from("business_settings")
           .select("key,value")
           .eq("business_id", businessId)
-          .in("key", ["whatsapp_provider", "auto_reminder", "dashboard_motivation"]),
+          .in("key", ["whatsapp_provider", "auto_reminder", "dashboard_motivation", "favicon_url", "use_logo_as_favicon"]),
       ]);
 
       if (b) {
+        setLogoUrl(b.logo_url ?? null);
         setForm({
           name: b.name,
           address: b.address ?? "",
@@ -83,6 +89,8 @@ export function BusinessSettingsManager({ businessId, role }: { businessId: stri
         if (row.key === "auto_reminder") {
           setAutoReminder(Boolean((row.value as Record<string, unknown>)?.enabled));
         }
+        if (row.key === "favicon_url") setFaviconUrl(String((row.value as Record<string, unknown>)?.url ?? "") || null);
+        if (row.key === "use_logo_as_favicon") setUseLogoAsFavicon(Boolean((row.value as Record<string, unknown>)?.enabled ?? true));
         if (row.key === "dashboard_motivation") {
           const parsed = normalizeDashboardMotivation(row.value);
           setMotivationEnabled(parsed.enabled);
@@ -110,6 +118,64 @@ export function BusinessSettingsManager({ businessId, role }: { businessId: stri
   function resetQuotes() {
     setQuotes([...DEFAULT_DASHBOARD_QUOTES]);
     setMotivationEnabled(true);
+  }
+
+  async function uploadBrandAsset(kind: "logo" | "favicon", file: File) {
+    if (!canOwner) return;
+    const setter = kind === "logo" ? setUploadingLogo : setUploadingFavicon;
+    setter(true);
+    setMsg(null);
+    try {
+      if (!file.type.startsWith("image/")) throw new Error("File harus berupa gambar.");
+      if (file.size > 2 * 1024 * 1024) throw new Error("Ukuran file maksimal 2 MB.");
+      const ext = (file.name.split(".").pop() || "png").toLowerCase().replace(/[^a-z0-9]/g, "") || "png";
+      const path = `${businessId}/${kind}-${Date.now()}.${ext}`;
+      const { error: uploadError } = await supabase.storage.from("branding").upload(path, file, {
+        cacheControl: "3600", upsert: true, contentType: file.type,
+      });
+      if (uploadError) throw uploadError;
+      const { data } = supabase.storage.from("branding").getPublicUrl(path);
+      const url = `${data.publicUrl}?v=${Date.now()}`;
+      if (kind === "logo") {
+        const { error } = await supabase.from("businesses").update({ logo_url: url }).eq("id", businessId);
+        if (error) throw error;
+        setLogoUrl(url);
+      } else {
+        const { error } = await supabase.from("business_settings").upsert({ business_id: businessId, key: "favicon_url", value: { url } }, { onConflict: "business_id,key" });
+        if (error) throw error;
+        setFaviconUrl(url);
+      }
+      window.dispatchEvent(new CustomEvent("imersorder:branding-updated", { detail: { logoUrl: kind === "logo" ? url : logoUrl, faviconUrl: kind === "favicon" ? url : faviconUrl } }));
+      setMsg({ kind: "success", text: `${kind === "logo" ? "Logo" : "Favicon"} berhasil diperbarui.` });
+    } catch (e) {
+      setMsg({ kind: "error", text: e instanceof Error ? e.message : "Gagal mengunggah gambar." });
+    } finally {
+      setter(false);
+    }
+  }
+
+  async function removeBrandAsset(kind: "logo" | "favicon") {
+    if (!canOwner) return;
+    setMsg(null);
+    if (kind === "logo") {
+      const { error } = await supabase.from("businesses").update({ logo_url: null }).eq("id", businessId);
+      if (error) return setMsg({ kind: "error", text: error.message });
+      setLogoUrl(null);
+    } else {
+      const { error } = await supabase.from("business_settings").upsert({ business_id: businessId, key: "favicon_url", value: { url: null } }, { onConflict: "business_id,key" });
+      if (error) return setMsg({ kind: "error", text: error.message });
+      setFaviconUrl(null);
+    }
+    window.dispatchEvent(new Event("imersorder:branding-updated"));
+    setMsg({ kind: "success", text: `${kind === "logo" ? "Logo" : "Favicon"} dihapus.` });
+  }
+
+  async function saveFaviconPreference(enabled: boolean) {
+    setUseLogoAsFavicon(enabled);
+    if (!canOwner) return;
+    const { error } = await supabase.from("business_settings").upsert({ business_id: businessId, key: "use_logo_as_favicon", value: { enabled } }, { onConflict: "business_id,key" });
+    if (error) setMsg({ kind: "error", text: error.message });
+    window.dispatchEvent(new Event("imersorder:branding-updated"));
   }
 
   async function save(e: React.FormEvent) {
@@ -147,6 +213,7 @@ export function BusinessSettingsManager({ businessId, role }: { businessId: stri
         [
           { business_id: businessId, key: "whatsapp_provider", value: { provider } },
           { business_id: businessId, key: "auto_reminder", value: { enabled: provider !== "manual" && autoReminder } },
+          { business_id: businessId, key: "use_logo_as_favicon", value: { enabled: useLogoAsFavicon } },
           {
             business_id: businessId,
             key: "dashboard_motivation",
@@ -200,6 +267,36 @@ export function BusinessSettingsManager({ businessId, role }: { businessId: stri
             <input value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
           </label>
         </div>
+
+        <div className="settingsSectionHead">
+          <div>
+            <h2>Branding & Identitas</h2>
+            <p>Upload logo usaha dan favicon langsung dari Pengaturan. File disimpan di Supabase Storage instalasi ini.</p>
+          </div>
+          <span className="settingsFeatureIcon"><ImageIcon size={17} /></span>
+        </div>
+        <div className="brandingUploadGrid">
+          <div className="brandingUploadCard">
+            <div className="brandingPreview">{logoUrl ? <img src={logoUrl} alt="Logo usaha" /> : <ImageIcon size={28} />}</div>
+            <div className="brandingUploadCopy"><strong>Logo Usaha</strong><small>PNG, JPG, WEBP · maksimal 2 MB</small></div>
+            {canOwner ? <div className="brandingActions">
+              <label className="miniButton primary"><Upload size={14} /> {uploadingLogo ? "Mengunggah..." : logoUrl ? "Ganti Logo" : "Upload Logo"}<input type="file" accept="image/png,image/jpeg,image/webp" hidden disabled={uploadingLogo} onChange={(e) => { const f=e.target.files?.[0]; if(f) void uploadBrandAsset("logo", f); e.currentTarget.value=""; }} /></label>
+              {logoUrl ? <button type="button" className="miniButton danger" onClick={() => void removeBrandAsset("logo")}><X size={14}/> Hapus</button> : null}
+            </div> : null}
+          </div>
+          <div className="brandingUploadCard">
+            <div className="brandingPreview faviconPreview">{faviconUrl ? <img src={faviconUrl} alt="Favicon" /> : <ImageIcon size={24} />}</div>
+            <div className="brandingUploadCopy"><strong>Favicon</strong><small>Ikon tab browser/PWA · maksimal 2 MB</small></div>
+            {canOwner ? <div className="brandingActions">
+              <label className="miniButton primary"><Upload size={14} /> {uploadingFavicon ? "Mengunggah..." : faviconUrl ? "Ganti Favicon" : "Upload Favicon"}<input type="file" accept="image/png,image/jpeg,image/webp,image/x-icon" hidden disabled={uploadingFavicon} onChange={(e) => { const f=e.target.files?.[0]; if(f) void uploadBrandAsset("favicon", f); e.currentTarget.value=""; }} /></label>
+              {faviconUrl ? <button type="button" className="miniButton danger" onClick={() => void removeBrandAsset("favicon")}><X size={14}/> Hapus</button> : null}
+            </div> : null}
+          </div>
+        </div>
+        <label className="checkboxField brandingFaviconToggle">
+          <input type="checkbox" checked={useLogoAsFavicon} disabled={!canOwner} onChange={(e) => void saveFaviconPreference(e.target.checked)} />
+          Gunakan logo utama sebagai favicon jika favicon khusus tidak digunakan
+        </label>
 
         <div className="settingsSectionHead">
           <div>
