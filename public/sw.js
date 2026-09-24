@@ -1,4 +1,4 @@
-const CACHE_VERSION = "pesanlunas-shell-v021";
+const CACHE_VERSION = "imersorder-branding-v024";
 self.addEventListener("install", () => self.skipWaiting());
 self.addEventListener("activate", (event) => {
   event.waitUntil((async () => {
