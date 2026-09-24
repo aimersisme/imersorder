@@ -48,7 +48,9 @@ export function BusinessSettingsManager({ businessId, role }: { businessId: stri
   const [logoPreviewError, setLogoPreviewError] = useState(false);
   const [faviconPreviewError, setFaviconPreviewError] = useState(false);
   const [autoReminder, setAutoReminder] = useState(false);
+  const [templateSlug, setTemplateSlug] = useState("catering");
   const [catalogEnabled, setCatalogEnabled] = useState(false);
+  const [seedingDemo, setSeedingDemo] = useState(false);
   const [catalogDescription, setCatalogDescription] = useState("Bagikan katalog dan terima pesanan online dengan lebih rapi.");
   const [catalogShowPrices, setCatalogShowPrices] = useState(true);
   const [catalogAcceptOrders, setCatalogAcceptOrders] = useState(true);
@@ -63,7 +65,7 @@ export function BusinessSettingsManager({ businessId, role }: { businessId: stri
       const [{ data: b }, { data: s }] = await Promise.all([
         supabase
           .from("businesses")
-          .select("name,address,whatsapp,email,timezone,currency,invoice_prefix,order_prefix,sku_prefix,logo_url")
+          .select("name,address,whatsapp,email,timezone,currency,invoice_prefix,order_prefix,sku_prefix,logo_url,template_slug")
           .eq("id", businessId)
           .single(),
         supabase
@@ -74,6 +76,7 @@ export function BusinessSettingsManager({ businessId, role }: { businessId: stri
       ]);
 
       if (b) {
+        setTemplateSlug(String(b.template_slug ?? "catering"));
         setLogoUrl(b.logo_url ? String(b.logo_url) : null);
         setLogoPreviewError(false);
         setForm({
@@ -213,6 +216,26 @@ export function BusinessSettingsManager({ businessId, role }: { businessId: stri
     window.dispatchEvent(new Event("imersorder:branding-updated"));
   }
 
+  async function seedExistingDemo() {
+    if (!canOwner || templateSlug !== "catering") return;
+    if (!window.confirm("Isi usaha ini dengan data contoh Katering: 10 pelanggan, 3 piutang, dan 6 produk? Data contoh akan ditambahkan dan tidak akan diulang jika sudah pernah diisi.")) return;
+    setSeedingDemo(true);
+    setMsg(null);
+    const { data, error } = await supabase.rpc("seed_catering_demo_data", { p_business_id: businessId });
+    setSeedingDemo(false);
+    if (error) {
+      setMsg({ kind: "error", text: error.message });
+      return;
+    }
+    const result = (data ?? {}) as { seeded?: boolean; already_seeded?: boolean };
+    if (result.already_seeded) {
+      setMsg({ kind: "success", text: "Data contoh Katering sudah pernah ditambahkan ke usaha ini." });
+      return;
+    }
+    setMsg({ kind: "success", text: "Data contoh berhasil ditambahkan: 10 pelanggan, 3 piutang, dan 6 produk Katering." });
+    setTimeout(() => window.location.reload(), 700);
+  }
+
   async function save(e: React.FormEvent) {
     e.preventDefault();
     if (!canOwner) {
@@ -346,6 +369,21 @@ export function BusinessSettingsManager({ businessId, role }: { businessId: stri
           <input type="checkbox" checked={useLogoAsFavicon} disabled={!canOwner} onChange={(e) => void saveFaviconPreference(e.target.checked)} />
           Gunakan logo utama sebagai favicon jika favicon khusus tidak digunakan
         </label>
+
+        {canOwner && templateSlug === "catering" ? (
+          <div className="catalogSettingsBox" style={{ marginTop: 16 }}>
+            <div className="settingsSectionHead" style={{ marginTop: 0 }}>
+              <div>
+                <h2>Data Contoh Katering</h2>
+                <p>Untuk usaha yang sudah dibuat, data demo tetap bisa ditambahkan tanpa membuat usaha baru.</p>
+              </div>
+            </div>
+            <button type="button" className="miniButton primary" onClick={() => void seedExistingDemo()} disabled={seedingDemo}>
+              {seedingDemo ? "Menambahkan data..." : "Isi Data Contoh Katering"}
+            </button>
+            <div className="formHint" style={{ marginTop: 8 }}>10 pelanggan · 3 piutang · 6 produk. Data demo hanya bisa di-seed sekali untuk usaha ini.</div>
+          </div>
+        ) : null}
 
         <div className="settingsSectionHead">
           <div>
