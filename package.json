@@ -1,6 +1,6 @@
 {
   "name": "imersorder",
-  "version": "1.0.0-r26",
+  "version": "1.0.0-r27",
   "private": true,
   "scripts": {
     "dev": "next dev",

@@ -4027,7 +4027,7 @@ insert into public.business_settings(business_id,key,value)
 select id,'catalog_accept_orders','{"enabled":true}'::jsonb from public.businesses
 on conflict (business_id,key) do nothing;
 insert into public.business_settings(business_id,key,value)
-select id,'promo_popup','{"enabled":false,"title":"Promo & Pengumuman","text":"Ada promo terbaru untuk pelanggan Anda.","button":"Lihat Promo","url":"","delay_seconds":3}'::jsonb from public.businesses
+select id,'promo_popup','{"enabled":false,"title":"Promo & Pengumuman","text":"Ada promo terbaru untuk pelanggan Anda.","button":"Lihat Promo","url":"","delay_seconds":3,"image_url":""}'::jsonb from public.businesses
 on conflict (business_id,key) do nothing;
 insert into public.business_settings(business_id,key,value)
 select id,'promo_marquee','{"enabled":false,"text":"🔥 Promo terbaru tersedia — klik untuk melihat detail.","url":""}'::jsonb from public.businesses
