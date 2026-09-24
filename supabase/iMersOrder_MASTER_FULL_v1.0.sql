@@ -186,6 +186,7 @@ create table if not exists public.catalog_items (
   unit text not null default 'pcs',
   price bigint not null default 0 check (price >= 0),
   description text,
+  image_url text,
   is_active boolean not null default true,
   created_by uuid references public.profiles(id) on delete set null,
   created_at timestamptz not null default now(),
@@ -3673,6 +3674,34 @@ $$;
 revoke all on function public.get_business_invitation_preview(text) from public;
 grant execute on function public.get_business_invitation_preview(text) to anon, authenticated;
 
+
+-- iMersOrder r22: product image upload + square catalog presentation
+alter table public.catalog_items add column if not exists image_url text;
+
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('product-images','product-images',true,2097152,array['image/png','image/jpeg','image/webp'])
+on conflict (id) do update set public=true,file_size_limit=2097152,allowed_mime_types=array['image/png','image/jpeg','image/webp'];
+
+drop policy if exists product_images_public_read on storage.objects;
+create policy product_images_public_read on storage.objects
+for select to public using (bucket_id='product-images');
+
+drop policy if exists product_images_member_insert on storage.objects;
+create policy product_images_member_insert on storage.objects
+for insert to authenticated
+with check (bucket_id='product-images' and (storage.foldername(name))[1] in (select bm.business_id::text from public.business_members bm where bm.user_id=auth.uid() and bm.status='active'));
+
+drop policy if exists product_images_owner_update on storage.objects;
+create policy product_images_owner_update on storage.objects
+for update to authenticated
+using (bucket_id='product-images' and (storage.foldername(name))[1] in (select bm.business_id::text from public.business_members bm where bm.user_id=auth.uid() and bm.status='active' and bm.role in ('owner','admin')))
+with check (bucket_id='product-images' and (storage.foldername(name))[1] in (select bm.business_id::text from public.business_members bm where bm.user_id=auth.uid() and bm.status='active' and bm.role in ('owner','admin')));
+
+drop policy if exists product_images_owner_delete on storage.objects;
+create policy product_images_owner_delete on storage.objects
+for delete to authenticated
+using (bucket_id='product-images' and (storage.foldername(name))[1] in (select bm.business_id::text from public.business_members bm where bm.user_id=auth.uid() and bm.status='active' and bm.role in ('owner','admin')));
+
 commit;
 -- iMersOrder branding assets: public, non-sensitive logo/favicon only.
 insert into storage.buckets (id, name, public)
@@ -3771,7 +3800,7 @@ begin
 
   select coalesce(jsonb_agg(jsonb_build_object(
     'id',id,'name',name,'sku',sku,'unit',unit,'price',price,
-    'description',description,'category',coalesce(nullif(trim(category),''),'Lainnya')
+    'description',description,'category',coalesce(nullif(trim(category),''),'Lainnya'),'image_url',image_url
   ) order by category nulls last, name), '[]'::jsonb)
     into v_items
   from public.catalog_items
