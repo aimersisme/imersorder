@@ -35,10 +35,10 @@ export default async function manifest(): Promise<MetadataRoute.Manifest> {
     start_url: "/dashboard",
     display: "standalone",
     background_color: "#f5f7f4",
-    theme_color: "#07864f",
+    theme_color: "#071A3A",
     icons: [
       { src: `/api/pwa/icon?size=192&v=${encodeURIComponent(iconVersion)}`, sizes: "192x192", purpose: "any" },
-      { src: `/api/pwa/icon${iconQuery}`, sizes: "512x512", purpose: "maskable any" },
+      { src: `/api/pwa/icon${iconQuery}`, sizes: "512x512", purpose: "maskable" },
     ],
   };
 }
