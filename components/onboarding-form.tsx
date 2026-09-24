@@ -23,6 +23,7 @@ export function OnboardingForm() {
   const router = useRouter();
   const [name, setName] = useState("");
   const [template, setTemplate] = useState("catering");
+  const [seedDemo, setSeedDemo] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const slug = useMemo(() => slugify(name), [name]);
@@ -37,6 +38,7 @@ export function OnboardingForm() {
       p_name: name.trim(),
       p_slug: slug,
       p_template_slug: template,
+      p_seed_demo: template === "catering" ? seedDemo : false,
     });
     if (error) {
       setError(error.message.includes("duplicate") ? "Nama/slug usaha sudah dipakai. Coba nama lain." : error.message);
@@ -66,6 +68,15 @@ export function OnboardingForm() {
               </label>
             ))}
           </fieldset>
+          {template === "catering" && (
+            <label className="demoDataChoice">
+              <input type="checkbox" checked={seedDemo} onChange={(e) => setSeedDemo(e.target.checked)} />
+              <span>
+                <strong>Gunakan data contoh Katering</strong>
+                <small>Isi otomatis 10 pelanggan, 3 piutang, dan 6 produk catering. Bisa dihapus atau diedit setelah masuk.</small>
+              </span>
+            </label>
+          )}
           {error && <div className="formMessage">{error}</div>}
           <button className="primaryButton" disabled={loading}>{loading ? "Menyiapkan usaha..." : "Buat Usaha & Masuk Dashboard"}</button>
         </form>
