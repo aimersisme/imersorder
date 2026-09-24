@@ -45,6 +45,8 @@ export function BusinessSettingsManager({ businessId, role }: { businessId: stri
   const [useLogoAsFavicon, setUseLogoAsFavicon] = useState(true);
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [uploadingFavicon, setUploadingFavicon] = useState(false);
+  const [logoPreviewError, setLogoPreviewError] = useState(false);
+  const [faviconPreviewError, setFaviconPreviewError] = useState(false);
   const [autoReminder, setAutoReminder] = useState(false);
   const [catalogEnabled, setCatalogEnabled] = useState(false);
   const [catalogDescription, setCatalogDescription] = useState("Bagikan katalog dan terima pesanan online dengan lebih rapi.");
@@ -72,7 +74,8 @@ export function BusinessSettingsManager({ businessId, role }: { businessId: stri
       ]);
 
       if (b) {
-        setLogoUrl(b.logo_url ?? null);
+        setLogoUrl(b.logo_url ? String(b.logo_url) : null);
+        setLogoPreviewError(false);
         setForm({
           name: b.name,
           address: b.address ?? "",
@@ -93,7 +96,7 @@ export function BusinessSettingsManager({ businessId, role }: { businessId: stri
         if (row.key === "auto_reminder") {
           setAutoReminder(Boolean((row.value as Record<string, unknown>)?.enabled));
         }
-        if (row.key === "favicon_url") setFaviconUrl(String((row.value as Record<string, unknown>)?.url ?? "") || null);
+        if (row.key === "favicon_url") { setFaviconUrl(String((row.value as Record<string, unknown>)?.url ?? "") || null); setFaviconPreviewError(false); }
         if (row.key === "use_logo_as_favicon") setUseLogoAsFavicon(Boolean((row.value as Record<string, unknown>)?.enabled ?? true));
         if (row.key === "catalog_enabled") setCatalogEnabled(Boolean((row.value as Record<string, unknown>)?.enabled));
         if (row.key === "catalog_description") setCatalogDescription(String((row.value as Record<string, unknown>)?.text ?? ""));
@@ -145,13 +148,22 @@ export function BusinessSettingsManager({ businessId, role }: { businessId: stri
       const { data } = supabase.storage.from("branding").getPublicUrl(path);
       const url = `${data.publicUrl}?v=${Date.now()}`;
       if (kind === "logo") {
-        const { error } = await supabase.from("businesses").update({ logo_url: url }).eq("id", businessId);
+        const { data: savedBusiness, error } = await supabase
+          .from("businesses")
+          .update({ logo_url: url })
+          .eq("id", businessId)
+          .select("id,logo_url")
+          .single();
         if (error) throw error;
-        setLogoUrl(url);
+        const savedUrl = String(savedBusiness?.logo_url ?? "");
+        if (!savedUrl) throw new Error("Logo berhasil di-upload tetapi belum tersimpan di data usaha.");
+        setLogoUrl(savedUrl);
+        setLogoPreviewError(false);
       } else {
         const { error } = await supabase.from("business_settings").upsert({ business_id: businessId, key: "favicon_url", value: { url } }, { onConflict: "business_id,key" });
         if (error) throw error;
         setFaviconUrl(url);
+        setFaviconPreviewError(false);
       }
       window.dispatchEvent(new CustomEvent("imersorder:branding-updated", { detail: { logoUrl: kind === "logo" ? url : logoUrl, faviconUrl: kind === "favicon" ? url : faviconUrl } }));
       setMsg({ kind: "success", text: `${kind === "logo" ? "Logo" : "Favicon"} berhasil diperbarui.` });
@@ -169,10 +181,12 @@ export function BusinessSettingsManager({ businessId, role }: { businessId: stri
       const { error } = await supabase.from("businesses").update({ logo_url: null }).eq("id", businessId);
       if (error) return setMsg({ kind: "error", text: error.message });
       setLogoUrl(null);
+      setLogoPreviewError(false);
     } else {
       const { error } = await supabase.from("business_settings").upsert({ business_id: businessId, key: "favicon_url", value: { url: null } }, { onConflict: "business_id,key" });
       if (error) return setMsg({ kind: "error", text: error.message });
       setFaviconUrl(null);
+      setFaviconPreviewError(false);
     }
     window.dispatchEvent(new Event("imersorder:branding-updated"));
     setMsg({ kind: "success", text: `${kind === "logo" ? "Logo" : "Favicon"} dihapus.` });
@@ -287,9 +301,19 @@ export function BusinessSettingsManager({ businessId, role }: { businessId: stri
           </div>
           <span className="settingsFeatureIcon"><ImageIcon size={17} /></span>
         </div>
+        <div className="brandingCurrent">
+          <div className="brandingCurrentPreview">
+            {logoUrl && !logoPreviewError ? <img key={logoUrl} src={logoUrl} alt="Logo usaha yang sedang digunakan" onError={() => setLogoPreviewError(true)} /> : <ImageIcon size={34} />}
+          </div>
+          <div className="brandingCurrentCopy">
+            <span className={logoUrl && !logoPreviewError ? "brandingStatus active" : "brandingStatus"}>{logoUrl && !logoPreviewError ? "✓ LOGO AKTIF" : "BELUM ADA LOGO"}</span>
+            <strong>{logoUrl && !logoPreviewError ? "Logo ini sedang digunakan aplikasi" : "Upload logo usaha untuk mengganti identitas aplikasi"}</strong>
+            <small>{logoUrl && !logoPreviewError ? "Logo yang tampil di sini akan digunakan pada header, dashboard, login, dan katalog publik." : "Setelah upload berhasil, preview ini langsung berubah agar bisa dipastikan sebelum pindah halaman."}</small>
+          </div>
+        </div>
         <div className="brandingUploadGrid">
           <div className="brandingUploadCard">
-            <div className="brandingPreview">{logoUrl ? <img src={logoUrl} alt="Logo usaha" /> : <ImageIcon size={28} />}</div>
+            <div className="brandingPreview">{logoUrl && !logoPreviewError ? <img key={logoUrl} src={logoUrl} alt="Logo usaha" onError={() => setLogoPreviewError(true)} /> : <ImageIcon size={28} />}</div>
             <div className="brandingUploadCopy"><strong>Logo Usaha</strong><small>PNG, JPG, WEBP · maksimal 2 MB</small></div>
             {canOwner ? <div className="brandingActions">
               <label className="miniButton primary"><Upload size={14} /> {uploadingLogo ? "Mengunggah..." : logoUrl ? "Ganti Logo" : "Upload Logo"}<input type="file" accept="image/png,image/jpeg,image/webp" hidden disabled={uploadingLogo} onChange={(e) => { const f=e.target.files?.[0]; if(f) void uploadBrandAsset("logo", f); e.currentTarget.value=""; }} /></label>
@@ -297,7 +321,7 @@ export function BusinessSettingsManager({ businessId, role }: { businessId: stri
             </div> : null}
           </div>
           <div className="brandingUploadCard">
-            <div className="brandingPreview faviconPreview">{faviconUrl ? <img src={faviconUrl} alt="Favicon" /> : <ImageIcon size={24} />}</div>
+            <div className="brandingPreview faviconPreview">{faviconUrl && !faviconPreviewError ? <img key={faviconUrl} src={faviconUrl} alt="Favicon" onError={() => setFaviconPreviewError(true)} /> : <ImageIcon size={24} />}</div>
             <div className="brandingUploadCopy"><strong>Favicon</strong><small>Ikon tab browser/PWA · maksimal 2 MB</small></div>
             {canOwner ? <div className="brandingActions">
               <label className="miniButton primary"><Upload size={14} /> {uploadingFavicon ? "Mengunggah..." : faviconUrl ? "Ganti Favicon" : "Upload Favicon"}<input type="file" accept="image/png,image/jpeg,image/webp,image/x-icon" hidden disabled={uploadingFavicon} onChange={(e) => { const f=e.target.files?.[0]; if(f) void uploadBrandAsset("favicon", f); e.currentTarget.value=""; }} /></label>

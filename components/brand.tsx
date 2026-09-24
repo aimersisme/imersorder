@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/browser";
 export function Brand({ compact = false, showTagline = false }: { compact?: boolean; showTagline?: boolean }) {
   const [logo, setLogo] = useState("/icon.png");
   const [name, setName] = useState("iMersOrder");
+  const [imageFailed, setImageFailed] = useState(false);
 
   useEffect(() => {
     const supabase = createClient();
@@ -43,8 +44,8 @@ export function Brand({ compact = false, showTagline = false }: { compact?: bool
       if (!active || !business) return;
 
       const businessLogo = String(business.logo_url ?? "");
-      if (businessLogo) setLogo(businessLogo);
-      else setLogo("/icon.png");
+      if (businessLogo) { setLogo(businessLogo); setImageFailed(false); }
+      else { setLogo("/icon.png"); setImageFailed(false); }
       if (business.name) setName(String(business.name));
 
       const { data: rows } = await supabase
@@ -60,7 +61,7 @@ export function Brand({ compact = false, showTagline = false }: { compact?: bool
     void load();
     const refresh = (event: Event) => {
       const detail = (event as CustomEvent<{ logoUrl?: string | null; faviconUrl?: string | null }>).detail;
-      if (detail?.logoUrl !== undefined && detail.logoUrl) setLogo(detail.logoUrl);
+      if (detail?.logoUrl !== undefined && detail.logoUrl) { setLogo(detail.logoUrl); setImageFailed(false); }
       if (detail?.faviconUrl !== undefined && detail.faviconUrl) applyFavicon(detail.faviconUrl);
       void load();
     };
@@ -70,7 +71,7 @@ export function Brand({ compact = false, showTagline = false }: { compact?: bool
 
   return (
     <div className={`brand ${showTagline ? "brandWithTagline" : ""}`}>
-      <img className="brandLogo" src={logo} width={44} height={44} alt={`Logo ${name}`} />
+      <img className="brandLogo" src={imageFailed ? "/icon.png" : logo} width={44} height={44} alt={`Logo ${name}`} onError={() => setImageFailed(true)} />
       {!compact ? <span className="brandCopy"><span className="brandName">{name}</span>{showTagline ? <span className="brandTagline">Katalog online, pesanan lebih teratur.</span> : null}</span> : null}
     </div>
   );
