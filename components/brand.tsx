@@ -41,6 +41,17 @@ export function Brand({ compact = false, showTagline = false }: { compact?: bool
 
       // Fallback to the RPC payload for older database functions.
       if (!business && ctx) business = ctx;
+
+      // Login happens before a Supabase auth session exists, so the authenticated
+      // business context above is unavailable there. Read only non-sensitive
+      // branding through the public branding RPC so login can use the uploaded
+      // logo too.
+      let publicBranding: Record<string, unknown> | null = null;
+      if (!business) {
+        const { data } = await supabase.rpc("get_public_branding");
+        if (data && typeof data === "object") publicBranding = data as Record<string, unknown>;
+        if (publicBranding) business = publicBranding;
+      }
       if (!active || !business) return;
 
       const businessLogo = String(business.logo_url ?? "");
@@ -48,13 +59,17 @@ export function Brand({ compact = false, showTagline = false }: { compact?: bool
       else { setLogo("/icon.png"); setImageFailed(false); }
       if (business.name) setName(String(business.name));
 
-      const { data: rows } = await supabase
-        .from("business_settings")
-        .select("key,value")
-        .in("key", ["favicon_url", "use_logo_as_favicon"]);
-      const map = new Map((rows ?? []).map((row) => [row.key, row.value as Record<string, unknown>]));
-      const custom = String(map.get("favicon_url")?.url ?? "");
-      const useLogo = Boolean(map.get("use_logo_as_favicon")?.enabled ?? true);
+      let custom = String(publicBranding?.favicon_url ?? "");
+      let useLogo = Boolean(publicBranding?.use_logo_as_favicon ?? true);
+      if (businessId) {
+        const { data: rows } = await supabase
+          .from("business_settings")
+          .select("key,value")
+          .in("key", ["favicon_url", "use_logo_as_favicon"]);
+        const map = new Map((rows ?? []).map((row) => [row.key, row.value as Record<string, unknown>]));
+        custom = String(map.get("favicon_url")?.url ?? custom);
+        useLogo = Boolean(map.get("use_logo_as_favicon")?.enabled ?? useLogo);
+      }
       applyFavicon(custom || (useLogo && businessLogo ? businessLogo : "/icon.png"));
     };
 

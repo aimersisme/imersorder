@@ -141,10 +141,20 @@ export function BusinessSettingsManager({ businessId, role }: { businessId: stri
       if (file.size > 2 * 1024 * 1024) throw new Error("Ukuran file maksimal 2 MB.");
       const ext = (file.name.split(".").pop() || "png").toLowerCase().replace(/[^a-z0-9]/g, "") || "png";
       const path = `${businessId}/${kind}-${Date.now()}.${ext}`;
-      const { error: uploadError } = await supabase.storage.from("branding").upload(path, file, {
+      const bucket = supabase.storage.from("branding");
+      const { error: uploadError } = await bucket.upload(path, file, {
         cacheControl: "3600", upsert: true, contentType: file.type,
       });
-      if (uploadError) throw uploadError;
+      if (uploadError) {
+        const message = String(uploadError.message || "");
+        if (/bucket.*not found|not found.*bucket/i.test(message)) {
+          throw new Error("Storage branding belum tersedia. Jalankan migration supabase/migrations/202609240005_branding_uploads_hardening.sql di Supabase, lalu coba upload lagi.");
+        }
+        if (/row-level security|rls|policy/i.test(message)) {
+          throw new Error(`Upload ditolak oleh policy Storage branding. Pastikan migration 202609240005_branding_uploads_hardening.sql sudah dijalankan dan akun ini adalah Owner aktif. Detail: ${message}`);
+        }
+        throw uploadError;
+      }
       const { data } = supabase.storage.from("branding").getPublicUrl(path);
       const url = `${data.publicUrl}?v=${Date.now()}`;
       if (kind === "logo") {
@@ -168,7 +178,10 @@ export function BusinessSettingsManager({ businessId, role }: { businessId: stri
       window.dispatchEvent(new CustomEvent("imersorder:branding-updated", { detail: { logoUrl: kind === "logo" ? url : logoUrl, faviconUrl: kind === "favicon" ? url : faviconUrl } }));
       setMsg({ kind: "success", text: `${kind === "logo" ? "Logo" : "Favicon"} berhasil diperbarui.` });
     } catch (e) {
-      setMsg({ kind: "error", text: e instanceof Error ? e.message : "Gagal mengunggah gambar." });
+      const err = e as { message?: string; details?: string; hint?: string; code?: string; statusCode?: string | number };
+      const detail = [err?.message, err?.details, err?.hint].filter(Boolean).join(" — ");
+      const text = detail || (e instanceof Error ? e.message : "Gagal mengunggah gambar.");
+      setMsg({ kind: "error", text });
     } finally {
       setter(false);
     }
