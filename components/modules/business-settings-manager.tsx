@@ -36,6 +36,12 @@ const empty: F = {
 const cleanPrefix = (value: string, fallback: string) =>
   value.toUpperCase().replace(/[^A-Z0-9_-]/g, "").slice(0, 12) || fallback;
 
+const safeExternalUrl = (value: string) => {
+  const v = value.trim();
+  if (!v) return "";
+  try { const u = new URL(v); return u.protocol === "https:" ? u.toString() : ""; } catch { return ""; }
+};
+
 export function BusinessSettingsManager({ businessId, role }: { businessId: string; role: string }) {
   const supabase = useMemo(() => createClient(), []);
   const [form, setForm] = useState<F>(empty);
@@ -54,6 +60,15 @@ export function BusinessSettingsManager({ businessId, role }: { businessId: stri
   const [catalogDescription, setCatalogDescription] = useState("Bagikan katalog dan terima pesanan online dengan lebih rapi.");
   const [catalogShowPrices, setCatalogShowPrices] = useState(true);
   const [catalogAcceptOrders, setCatalogAcceptOrders] = useState(true);
+  const [promoPopupEnabled, setPromoPopupEnabled] = useState(false);
+  const [promoPopupTitle, setPromoPopupTitle] = useState("Promo & Pengumuman");
+  const [promoPopupText, setPromoPopupText] = useState("Ada promo terbaru untuk pelanggan Anda.");
+  const [promoPopupButton, setPromoPopupButton] = useState("Lihat Promo");
+  const [promoPopupUrl, setPromoPopupUrl] = useState("");
+  const [promoPopupDelay, setPromoPopupDelay] = useState(3);
+  const [promoMarqueeEnabled, setPromoMarqueeEnabled] = useState(false);
+  const [promoMarqueeText, setPromoMarqueeText] = useState("🔥 Promo terbaru tersedia — klik untuk melihat detail.");
+  const [promoMarqueeUrl, setPromoMarqueeUrl] = useState("");
   const [motivationEnabled, setMotivationEnabled] = useState(true);
   const [quotes, setQuotes] = useState<string[]>([...DEFAULT_DASHBOARD_QUOTES]);
   const [saving, setSaving] = useState(false);
@@ -72,7 +87,7 @@ export function BusinessSettingsManager({ businessId, role }: { businessId: stri
           .from("business_settings")
           .select("key,value")
           .eq("business_id", businessId)
-          .in("key", ["whatsapp_provider", "auto_reminder", "dashboard_motivation", "favicon_url", "use_logo_as_favicon", "catalog_enabled", "catalog_description", "catalog_show_prices", "catalog_accept_orders"]),
+          .in("key", ["whatsapp_provider", "auto_reminder", "dashboard_motivation", "favicon_url", "use_logo_as_favicon", "catalog_enabled", "catalog_description", "catalog_show_prices", "catalog_accept_orders", "promo_popup", "promo_marquee"]),
       ]);
 
       if (b) {
@@ -105,6 +120,21 @@ export function BusinessSettingsManager({ businessId, role }: { businessId: stri
         if (row.key === "catalog_description") setCatalogDescription(String((row.value as Record<string, unknown>)?.text ?? ""));
         if (row.key === "catalog_show_prices") setCatalogShowPrices(Boolean((row.value as Record<string, unknown>)?.enabled ?? true));
         if (row.key === "catalog_accept_orders") setCatalogAcceptOrders(Boolean((row.value as Record<string, unknown>)?.enabled ?? true));
+        if (row.key === "promo_popup") {
+          const v = (row.value ?? {}) as Record<string, unknown>;
+          setPromoPopupEnabled(Boolean(v.enabled));
+          setPromoPopupTitle(String(v.title ?? "Promo & Pengumuman"));
+          setPromoPopupText(String(v.text ?? "Ada promo terbaru untuk pelanggan Anda."));
+          setPromoPopupButton(String(v.button ?? "Lihat Promo"));
+          setPromoPopupUrl(String(v.url ?? ""));
+          setPromoPopupDelay(Math.min(15, Math.max(0, Number(v.delay_seconds ?? 3))));
+        }
+        if (row.key === "promo_marquee") {
+          const v = (row.value ?? {}) as Record<string, unknown>;
+          setPromoMarqueeEnabled(Boolean(v.enabled));
+          setPromoMarqueeText(String(v.text ?? "🔥 Promo terbaru tersedia — klik untuk melihat detail."));
+          setPromoMarqueeUrl(String(v.url ?? ""));
+        }
         if (row.key === "dashboard_motivation") {
           const parsed = normalizeDashboardMotivation(row.value);
           setMotivationEnabled(parsed.enabled);
@@ -248,6 +278,16 @@ export function BusinessSettingsManager({ businessId, role }: { businessId: stri
       setMsg({ kind: "error", text: "Isi minimal satu quote motivasi atau nonaktifkan quote dashboard." });
       return;
     }
+    const popupUrl = safeExternalUrl(promoPopupUrl);
+    const marqueeUrl = safeExternalUrl(promoMarqueeUrl);
+    if (promoPopupEnabled && !popupUrl) {
+      setMsg({ kind: "error", text: "URL Popup wajib berupa alamat HTTPS yang valid." });
+      return;
+    }
+    if (promoMarqueeEnabled && promoMarqueeUrl.trim() && !marqueeUrl) {
+      setMsg({ kind: "error", text: "URL Marquee harus berupa alamat HTTPS yang valid." });
+      return;
+    }
 
     setSaving(true);
     setMsg(null);
@@ -276,6 +316,8 @@ export function BusinessSettingsManager({ businessId, role }: { businessId: stri
           { business_id: businessId, key: "catalog_description", value: { text: catalogDescription.trim() } },
           { business_id: businessId, key: "catalog_show_prices", value: { enabled: catalogShowPrices } },
           { business_id: businessId, key: "catalog_accept_orders", value: { enabled: catalogAcceptOrders } },
+          { business_id: businessId, key: "promo_popup", value: { enabled: promoPopupEnabled, title: promoPopupTitle.trim(), text: promoPopupText.trim(), button: promoPopupButton.trim(), url: popupUrl, delay_seconds: Math.min(15, Math.max(0, Number(promoPopupDelay) || 0)) } },
+          { business_id: businessId, key: "promo_marquee", value: { enabled: promoMarqueeEnabled, text: promoMarqueeText.trim(), url: marqueeUrl } },
           {
             business_id: businessId,
             key: "dashboard_motivation",
@@ -400,6 +442,32 @@ export function BusinessSettingsManager({ businessId, role }: { businessId: stri
             <label className="checkboxField"><input type="checkbox" checked={catalogAcceptOrders} disabled={!canOwner} onChange={e=>setCatalogAcceptOrders(e.target.checked)} />Terima pesanan online</label>
           </div>
           <div className="catalogUrlHint"><strong>URL katalog:</strong> alamat utama aplikasi ini. Customer cukup membuka URL tersebut tanpa login.</div>
+        </div>
+
+        <div className="settingsSectionHead">
+          <div>
+            <h2>Promosi Katalog</h2>
+            <p>Tambahkan pengumuman atau promo ringan di katalog publik. Keduanya opsional dan default-nya mati.</p>
+          </div>
+          <span className="settingsFeatureIcon"><ShoppingBag size={17} /></span>
+        </div>
+        <div className="catalogSettingsBox promoSettingsBox">
+          <label className="checkboxField catalogMainToggle"><input type="checkbox" checked={promoPopupEnabled} disabled={!canOwner} onChange={e=>setPromoPopupEnabled(e.target.checked)} /><span><strong>Popup Promo Aktif</strong><small>Popup hanya muncul di katalog publik. Klik popup/tombol akan membuka URL tujuan.</small></span></label>
+          <div className="fieldGrid">
+            <label className="formField"><span>Judul Popup</span><input value={promoPopupTitle} disabled={!canOwner} onChange={e=>setPromoPopupTitle(e.target.value)} maxLength={80} /></label>
+            <label className="formField"><span>Teks Tombol</span><input value={promoPopupButton} disabled={!canOwner} onChange={e=>setPromoPopupButton(e.target.value)} maxLength={40} /></label>
+            <label className="formField full"><span>Isi Popup</span><textarea value={promoPopupText} disabled={!canOwner} onChange={e=>setPromoPopupText(e.target.value)} maxLength={240} /></label>
+            <label className="formField"><span>URL Tujuan</span><input type="url" value={promoPopupUrl} disabled={!canOwner} onChange={e=>setPromoPopupUrl(e.target.value)} placeholder="https://contoh.com/promo" /></label>
+            <label className="formField"><span>Muncul Setelah (detik)</span><input type="number" min={0} max={15} value={promoPopupDelay} disabled={!canOwner} onChange={e=>setPromoPopupDelay(Number(e.target.value || 0))} /></label>
+          </div>
+          <div className="formHint">Popup dibatasi sekali per sesi browser agar tidak mengganggu pelanggan.</div>
+          <div className="promoDivider" />
+          <label className="checkboxField catalogMainToggle"><input type="checkbox" checked={promoMarqueeEnabled} disabled={!canOwner} onChange={e=>setPromoMarqueeEnabled(e.target.checked)} /><span><strong>Text Marquee Aktif</strong><small>Teks berjalan di bagian atas katalog dan bisa diarahkan ke hyperlink.</small></span></label>
+          <div className="fieldGrid">
+            <label className="formField full"><span>Teks Marquee</span><input value={promoMarqueeText} disabled={!canOwner} onChange={e=>setPromoMarqueeText(e.target.value)} maxLength={180} /></label>
+            <label className="formField full"><span>URL Tujuan (opsional)</span><input type="url" value={promoMarqueeUrl} disabled={!canOwner} onChange={e=>setPromoMarqueeUrl(e.target.value)} placeholder="https://contoh.com/promo" /></label>
+          </div>
+          <div className="formHint">Kalau URL diisi, marquee menjadi link yang bisa diklik. Warna otomatis mengikuti tema katalog.</div>
         </div>
 
         <div className="settingsSectionHead">

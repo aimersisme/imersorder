@@ -7,7 +7,7 @@ export const metadata: Metadata = {
   title: "iMersOrder",
   description: "Katalog online, pesanan lebih teratur.",
   applicationName: "iMersOrder",
-  manifest: "/manifest.webmanifest?v=24",
+  manifest: "/manifest.webmanifest?v=25",
   icons: {
     icon: [
       { url: "/api/pwa/icon?size=512", type: "image/png", sizes: "any" },
