@@ -1,6 +1,6 @@
 -- ============================================================
 -- iMersOrder — MASTER FULL Supabase Schema v1.4
--- Full fresh-install migration through app v0.2.8
+-- Full fresh-install migration through app v1.0.0-r19
 -- Brand: iMersOrder
 -- Tagline: Pesanan tercatat, tagihan cepat lunas.
 -- Stack target: Next.js + TypeScript + Supabase + Vercel + PWA
@@ -960,7 +960,8 @@ create trigger trg_invoice_items_immutable
 create or replace function public.create_business(
   p_name text,
   p_slug text,
-  p_template_slug text default 'catering'
+  p_template_slug text default 'catering',
+  p_seed_demo boolean default false
 )
 returns uuid
 language plpgsql
@@ -1044,6 +1045,55 @@ begin
     (v_business_id, 'ui', jsonb_build_object('theme','emerald','mobile_first',true)),
     (v_business_id, 'whatsapp', jsonb_build_object('provider','manual','auto_send_enabled',false)),
     (v_business_id, 'invoice', jsonb_build_object('show_logo',true,'show_payment_history',true));
+
+  -- Optional first-install demo data. This is intentionally opt-in so the
+  -- owner can start either with a clean database or a realistic catering demo.
+  if coalesce(p_seed_demo, false) then
+    if p_template_slug <> 'catering' then
+      raise exception 'Demo data is currently available for the Catering template only';
+    end if;
+
+    insert into public.customers(business_id, name, whatsapp, email, address, notes, created_by)
+    values
+      (v_business_id, 'Andi Pratama', '081234560001', 'andi@example.com', 'Jakarta Selatan', 'Contoh pelanggan catering', v_user),
+      (v_business_id, 'Budi Santoso', '081234560002', 'budi@example.com', 'Jakarta Timur', 'Contoh pelanggan catering', v_user),
+      (v_business_id, 'Citra Lestari', '081234560003', 'citra@example.com', 'Jakarta Pusat', 'Contoh pelanggan catering', v_user),
+      (v_business_id, 'Dedi Kurniawan', '081234560004', 'dedi@example.com', 'Depok', 'Contoh pelanggan catering', v_user),
+      (v_business_id, 'Eka Putri', '081234560005', 'eka@example.com', 'Bekasi', 'Contoh pelanggan catering', v_user),
+      (v_business_id, 'Fajar Hidayat', '081234560006', 'fajar@example.com', 'Tangerang', 'Contoh pelanggan catering', v_user),
+      (v_business_id, 'Gita Maharani', '081234560007', 'gita@example.com', 'Jakarta Barat', 'Contoh pelanggan catering', v_user),
+      (v_business_id, 'Hendra Wijaya', '081234560008', 'hendra@example.com', 'Jakarta Utara', 'Contoh pelanggan catering', v_user),
+      (v_business_id, 'Intan Permata', '081234560009', 'intan@example.com', 'Bogor', 'Contoh pelanggan catering', v_user),
+      (v_business_id, 'Joko Saputra', '081234560010', 'joko@example.com', 'Jakarta Selatan', 'Contoh pelanggan catering', v_user);
+
+    insert into public.catalog_items(business_id, name, sku, unit, price, description, category, created_by)
+    values
+      (v_business_id, 'Nasi Box Ayam Bakar', 'CAT-000001', 'box', 25000, 'Nasi, ayam bakar, tumis sayur, sambal, buah.', 'Nasi Box', v_user),
+      (v_business_id, 'Nasi Box Ayam Geprek', 'CAT-000002', 'box', 22000, 'Nasi, ayam geprek, lalapan, sambal.', 'Nasi Box', v_user),
+      (v_business_id, 'Nasi Box Rendang', 'CAT-000003', 'box', 30000, 'Nasi, rendang sapi, sayur, sambal, buah.', 'Nasi Box', v_user),
+      (v_business_id, 'Snack Box Standard', 'CAT-000004', 'box', 18000, 'Snack box isi 3 snack dan air mineral.', 'Snack Box', v_user),
+      (v_business_id, 'Snack Box Premium', 'CAT-000005', 'box', 25000, 'Snack box premium isi 4 snack dan minuman.', 'Snack Box', v_user),
+      (v_business_id, 'Tumpeng Mini', 'CAT-000006', 'set', 350000, 'Tumpeng mini untuk acara keluarga atau kantor.', 'Tumpeng', v_user);
+
+    insert into public.debt_records(
+      business_id, type, person_name, whatsapp, email, reference, original_amount,
+      balance_amount, transaction_date, due_date, notes, status, created_by
+    )
+    values
+      (v_business_id, 'receivable', 'Andi Pratama', '081234560001', 'andi@example.com', 'PIUTANG-DEMO-001', 850000, 850000, current_date - 5, current_date + 2, 'Contoh piutang catering — belum jatuh tempo.', 'open', v_user),
+      (v_business_id, 'receivable', 'Dedi Kurniawan', '081234560004', 'dedi@example.com', 'PIUTANG-DEMO-002', 1250000, 1250000, current_date - 12, current_date - 2, 'Contoh piutang catering — sudah melewati jatuh tempo.', 'open', v_user),
+      (v_business_id, 'receivable', 'Gita Maharani', '081234560007', 'gita@example.com', 'PIUTANG-DEMO-003', 2400000, 2400000, current_date - 3, current_date + 7, 'Contoh piutang catering — jatuh tempo minggu depan.', 'open', v_user);
+
+    insert into public.business_settings(business_id, key, value)
+    values (v_business_id, 'demo_data', jsonb_build_object(
+      'enabled', true,
+      'template', 'catering',
+      'customers', 10,
+      'receivables', 3,
+      'products', 6,
+      'label', 'Data Contoh Katering'
+    ));
+  end if;
 
   return v_business_id;
 end;
@@ -2285,7 +2335,7 @@ grant execute on function public.is_business_owner(uuid) to authenticated;
 grant execute on function public.shares_business_with(uuid) to authenticated;
 
 -- User-facing RPCs.
-revoke all on function public.create_business(text,text,text) from public;
+revoke all on function public.create_business(text,text,text,boolean) from public;
 revoke all on function public.create_order(uuid,jsonb) from public;
 revoke all on function public.issue_invoice(uuid) from public;
 revoke all on function public.record_payment(uuid,bigint,text,timestamptz,text,text,text) from public;
@@ -2296,7 +2346,7 @@ revoke all on function public.create_invoice_public_link(uuid,timestamptz) from 
 revoke all on function public.get_dashboard_summary(uuid,date,date) from public;
 revoke all on function public.resolve_public_invoice(text) from public;
 
-grant execute on function public.create_business(text,text,text) to authenticated;
+grant execute on function public.create_business(text,text,text,boolean) to authenticated;
 grant execute on function public.create_order(uuid,jsonb) to authenticated;
 grant execute on function public.issue_invoice(uuid) to authenticated;
 grant execute on function public.record_payment(uuid,bigint,text,timestamptz,text,text,text) to authenticated;
@@ -2313,7 +2363,8 @@ commit;
 -- POST-INSTALL CHECKLIST
 -- ============================================================
 -- [ ] Create one auth user through Supabase Auth.
--- [ ] Call: select public.create_business('Dapur Rina','dapur-rina','catering');
+-- [ ] Call: select public.create_business('Dapur Rina','dapur-rina','catering',false);
+-- [ ] Demo option: select public.create_business('Dapur Rina','dapur-rina','catering',true);
 -- [ ] Add a customer from the app/client.
 -- [ ] Call create_order(...) and verify order + invoice numbers.
 -- [ ] Record DP/cicilan using record_payment(...).

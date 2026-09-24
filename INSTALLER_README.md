@@ -1,4 +1,4 @@
-# iMersOrder v1.0.0-r18 — FULL CLIENT INSTALLER
+# iMersOrder v1.0.0-r19 — FULL CLIENT INSTALLER
 
 ## Fresh Client / Single Install
 
@@ -14,7 +14,7 @@ Architecture:
 
 Create a new Supabase project and run:
 
-`supabase/iMersOrder_MASTER_FULL_v1.7.sql`
+`supabase/iMersOrder_MASTER_FULL_v1.0.sql`
 
 Run it once on a fresh project.
 
@@ -22,9 +22,18 @@ Run it once on a fresh project.
 
 If you already run iMersOrder v0.2.10, do NOT rerun the full master schema. Run `iMersOrder_v1.0.0-r12_HUTANG_PIUTANG_PATCH.sql` once in the existing Supabase project.
 
-The fresh-install master already includes the same module as `supabase/iMersOrder_MASTER_FULL_v1.7.sql`.
+The fresh-install master already includes the same module as `supabase/iMersOrder_MASTER_FULL_v1.0.sql`.
 
-## 2. Vercel environment variables
+
+## 2. Data awal: pilih kosong atau data contoh
+
+Pada onboarding pertama, pilih salah satu:
+- **Mulai kosong** — usaha dibuat tanpa pelanggan, produk, atau piutang contoh.
+- **Gunakan data contoh Katering** — otomatis dibuat **10 pelanggan, 3 piutang, dan 6 produk catering**. Data contoh dapat diedit atau dihapus setelah masuk dashboard.
+
+Data contoh hanya untuk instalasi baru/business baru melalui onboarding. Tidak mengisi database client lama.
+
+## 3. Vercel environment variables
 
 Required:
 - NEXT_PUBLIC_SUPABASE_URL
@@ -38,7 +47,7 @@ Owner activation protection:
 
 Never put SUPABASE_SERVICE_ROLE_KEY in client-side code.
 
-## 3. GitHub + Vercel
+## 4. GitHub + Vercel
 
 Upload the contents of this package to the ROOT of a GitHub repository, then deploy that repository with Vercel.
 
@@ -49,7 +58,7 @@ TypeScript: 5.8.3
 Supabase JS: 2.49.8
 Supabase SSR: 0.6.1
 
-## 4. WhatsApp reminder
+## 5. WhatsApp reminder
 
 Without a gateway:
 - reminder monitoring remains visible in the app;
@@ -63,7 +72,7 @@ With Fonnte or Starsender:
 - configure the provider secret and REMINDER_CRON_SECRET;
 - schedule the Edge Function (daily minimum; hourly recommended).
 
-## 5. Authentication
+## 6. Authentication
 
 This is a single-install application. Public self-registration is disabled in the UI.
 
@@ -80,3 +89,6 @@ Normal WhatsApp sends use the signed-in Supabase session and a protected RPC to 
 
 ### r18 branding migration
 For an existing installation, run only `supabase/migrations/202609240006_branding_everywhere.sql`. Do not rerun the master SQL. This makes the uploaded logo available on login and on public invoice print/save-to-PDF.
+
+### r19 demo-data migration
+For an existing installation that wants the new onboarding option, run `supabase/migrations/202609240007_demo_data_option.sql` once. It adds the optional demo-data flag to business creation. It does not seed existing businesses automatically.

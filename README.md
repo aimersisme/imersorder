@@ -1,4 +1,4 @@
-# iMersOrder v1.0.0-r18 — Single Install + Optional WhatsApp Auto Reminder
+# iMersOrder v1.0.0-r19 — Single Install + Optional WhatsApp Auto Reminder
 
 Versi ini membawa seluruh fitur v0.2.7 Theme Engine, Quick Customer Order, Team Role Guide, Auto SKU, CRUD, performance/runtime fixes, lalu menambahkan personalisasi dashboard dan modul Hutang & Piutang standalone.
 
@@ -95,3 +95,7 @@ Scheduler tetap diperlukan untuk pengiriman otomatis tanpa membuka aplikasi. Jal
 ## WhatsApp Token
 
 Token Fonnte / API Key Starsender sekarang diisi langsung dari menu **Integrasi WhatsApp**. Tidak perlu menaruh token provider di Vercel Environment Variables atau Supabase Secrets. `REMINDER_CRON_SECRET` tetap digunakan untuk scheduler reminder.
+
+
+### Data awal r19
+Saat onboarding, pengguna dapat memilih database kosong atau data contoh Katering: 10 pelanggan, 3 piutang, dan 6 produk.
