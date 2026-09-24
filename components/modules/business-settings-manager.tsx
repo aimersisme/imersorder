@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Plus, Shuffle, Trash2, Upload, Image as ImageIcon, X } from "lucide-react";
+import { Plus, Shuffle, Trash2, Upload, Image as ImageIcon, X, ShoppingBag } from "lucide-react";
 import { createClient } from "@/lib/supabase/browser";
 import { FormActions, ModuleHeader, Notice } from "@/components/crud-ui";
 import {
@@ -46,6 +46,10 @@ export function BusinessSettingsManager({ businessId, role }: { businessId: stri
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [uploadingFavicon, setUploadingFavicon] = useState(false);
   const [autoReminder, setAutoReminder] = useState(false);
+  const [catalogEnabled, setCatalogEnabled] = useState(false);
+  const [catalogDescription, setCatalogDescription] = useState("Bagikan katalog dan terima pesanan online dengan lebih rapi.");
+  const [catalogShowPrices, setCatalogShowPrices] = useState(true);
+  const [catalogAcceptOrders, setCatalogAcceptOrders] = useState(true);
   const [motivationEnabled, setMotivationEnabled] = useState(true);
   const [quotes, setQuotes] = useState<string[]>([...DEFAULT_DASHBOARD_QUOTES]);
   const [saving, setSaving] = useState(false);
@@ -64,7 +68,7 @@ export function BusinessSettingsManager({ businessId, role }: { businessId: stri
           .from("business_settings")
           .select("key,value")
           .eq("business_id", businessId)
-          .in("key", ["whatsapp_provider", "auto_reminder", "dashboard_motivation", "favicon_url", "use_logo_as_favicon"]),
+          .in("key", ["whatsapp_provider", "auto_reminder", "dashboard_motivation", "favicon_url", "use_logo_as_favicon", "catalog_enabled", "catalog_description", "catalog_show_prices", "catalog_accept_orders"]),
       ]);
 
       if (b) {
@@ -91,6 +95,10 @@ export function BusinessSettingsManager({ businessId, role }: { businessId: stri
         }
         if (row.key === "favicon_url") setFaviconUrl(String((row.value as Record<string, unknown>)?.url ?? "") || null);
         if (row.key === "use_logo_as_favicon") setUseLogoAsFavicon(Boolean((row.value as Record<string, unknown>)?.enabled ?? true));
+        if (row.key === "catalog_enabled") setCatalogEnabled(Boolean((row.value as Record<string, unknown>)?.enabled));
+        if (row.key === "catalog_description") setCatalogDescription(String((row.value as Record<string, unknown>)?.text ?? ""));
+        if (row.key === "catalog_show_prices") setCatalogShowPrices(Boolean((row.value as Record<string, unknown>)?.enabled ?? true));
+        if (row.key === "catalog_accept_orders") setCatalogAcceptOrders(Boolean((row.value as Record<string, unknown>)?.enabled ?? true));
         if (row.key === "dashboard_motivation") {
           const parsed = normalizeDashboardMotivation(row.value);
           setMotivationEnabled(parsed.enabled);
@@ -214,6 +222,10 @@ export function BusinessSettingsManager({ businessId, role }: { businessId: stri
           { business_id: businessId, key: "whatsapp_provider", value: { provider } },
           { business_id: businessId, key: "auto_reminder", value: { enabled: provider !== "manual" && autoReminder } },
           { business_id: businessId, key: "use_logo_as_favicon", value: { enabled: useLogoAsFavicon } },
+          { business_id: businessId, key: "catalog_enabled", value: { enabled: catalogEnabled } },
+          { business_id: businessId, key: "catalog_description", value: { text: catalogDescription.trim() } },
+          { business_id: businessId, key: "catalog_show_prices", value: { enabled: catalogShowPrices } },
+          { business_id: businessId, key: "catalog_accept_orders", value: { enabled: catalogAcceptOrders } },
           {
             business_id: businessId,
             key: "dashboard_motivation",
@@ -297,6 +309,23 @@ export function BusinessSettingsManager({ businessId, role }: { businessId: stri
           <input type="checkbox" checked={useLogoAsFavicon} disabled={!canOwner} onChange={(e) => void saveFaviconPreference(e.target.checked)} />
           Gunakan logo utama sebagai favicon jika favicon khusus tidak digunakan
         </label>
+
+        <div className="settingsSectionHead">
+          <div>
+            <h2>Katalog Online</h2>
+            <p>Aktifkan halaman katalog publik di alamat utama aplikasi. Pengunjung tidak perlu login untuk melihat dan mengirim pesanan.</p>
+          </div>
+          <span className="settingsFeatureIcon"><ShoppingBag size={17} /></span>
+        </div>
+        <div className="catalogSettingsBox">
+          <label className="checkboxField catalogMainToggle"><input type="checkbox" checked={catalogEnabled} disabled={!canOwner} onChange={e=>setCatalogEnabled(e.target.checked)} /><span><strong>Katalog Online Aktif</strong><small>{catalogEnabled ? "URL utama akan membuka katalog publik." : "URL utama tetap meminta login."}</small></span></label>
+          <div className="fieldGrid">
+            <label className="formField full">Deskripsi Katalog<input value={catalogDescription} disabled={!canOwner} onChange={e=>setCatalogDescription(e.target.value)} placeholder="Katering, kue, custom, jasa, dan lainnya" /></label>
+            <label className="checkboxField"><input type="checkbox" checked={catalogShowPrices} disabled={!canOwner} onChange={e=>setCatalogShowPrices(e.target.checked)} />Tampilkan harga</label>
+            <label className="checkboxField"><input type="checkbox" checked={catalogAcceptOrders} disabled={!canOwner} onChange={e=>setCatalogAcceptOrders(e.target.checked)} />Terima pesanan online</label>
+          </div>
+          <div className="catalogUrlHint"><strong>URL katalog:</strong> alamat utama aplikasi ini. Customer cukup membuka URL tersebut tanpa login.</div>
+        </div>
 
         <div className="settingsSectionHead">
           <div>

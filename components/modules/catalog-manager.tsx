@@ -5,9 +5,9 @@ import {EmptyState,FormActions,ModuleHeader,Notice,Pagination,SearchBar} from "@
 import {formatIDR} from "@/lib/format";
 import {moneyInput} from "@/lib/client-utils";
 
-type Row={id:string;name:string;sku:string|null;unit:string;price:number|string;description:string|null;is_active:boolean;deleted_at:string|null};
-type F={name:string;unit:string;price:string;description:string;is_active:boolean};
-const empty:F={name:"",unit:"pcs",price:"0",description:"",is_active:true};
+type Row={id:string;name:string;sku:string|null;unit:string;price:number|string;description:string|null;category:string|null;is_active:boolean;deleted_at:string|null};
+type F={name:string;unit:string;price:string;description:string;category:string;is_active:boolean};
+const empty:F={name:"",unit:"pcs",price:"0",description:"",category:"",is_active:true};
 
 export function CatalogManager({businessId,role,skuPrefix}:{businessId:string;role:string;skuPrefix:string}){
   const supabase=useMemo(()=>createClient(),[]);
@@ -15,16 +15,16 @@ export function CatalogManager({businessId,role,skuPrefix}:{businessId:string;ro
   const canDelete=role==="owner"||role==="admin";
   const prefix=(skuPrefix||"SKU").toUpperCase();
 
-  const load=useCallback(async()=>{setLoading(true);const{data,error}=await supabase.from("catalog_items").select("id,name,sku,unit,price,description,is_active,deleted_at").eq("business_id",businessId).is("deleted_at",null).order("name");if(error)setMsg({kind:"error",text:error.message});setRows((data??[]) as Row[]);setLoading(false)},[businessId,supabase]);
+  const load=useCallback(async()=>{setLoading(true);const{data,error}=await supabase.from("catalog_items").select("id,name,sku,unit,price,description,category,is_active,deleted_at").eq("business_id",businessId).is("deleted_at",null).order("name");if(error)setMsg({kind:"error",text:error.message});setRows((data??[]) as Row[]);setLoading(false)},[businessId,supabase]);
   useEffect(()=>{void load()},[load]);useEffect(()=>setPage(1),[q,size]);
   const filtered=rows.filter(r=>`${r.name} ${r.sku??""} ${r.description??""}`.toLowerCase().includes(q.toLowerCase()));const pages=Math.max(1,Math.ceil(filtered.length/size));const view=filtered.slice((page-1)*size,page*size);
 
   function add(){setEditing(null);setForm(empty);setShow(true);setMsg(null)}
-  function edit(r:Row){setEditing(r);setForm({name:r.name,unit:r.unit,price:String(r.price??0),description:r.description??"",is_active:r.is_active});setShow(true);setMsg(null)}
+  function edit(r:Row){setEditing(r);setForm({name:r.name,unit:r.unit,price:String(r.price??0),description:r.description??"",category:r.category??"",is_active:r.is_active});setShow(true);setMsg(null)}
 
   async function save(e:React.FormEvent){
     e.preventDefault();if(!form.name.trim())return setMsg({kind:"error",text:"Nama produk/jasa wajib diisi."});setSaving(true);
-    const payload={business_id:businessId,name:form.name.trim(),unit:form.unit.trim()||"pcs",price:moneyInput(form.price),description:form.description.trim()||null,is_active:form.is_active};
+    const payload={business_id:businessId,name:form.name.trim(),unit:form.unit.trim()||"pcs",price:moneyInput(form.price),description:form.description.trim()||null,category:form.category.trim()||null,is_active:form.is_active};
     // SKU tidak pernah dikirim dari browser. Database membuatnya atomik dari prefix usaha.
     const res=editing?await supabase.from("catalog_items").update(payload).eq("id",editing.id):await supabase.from("catalog_items").insert(payload);
     setSaving(false);if(res.error)return setMsg({kind:"error",text:res.error.message});setMsg({kind:"success",text:editing?"Produk/jasa diperbarui.":"Produk/jasa ditambahkan. SKU dibuat otomatis."});setShow(false);await load()
@@ -42,6 +42,7 @@ export function CatalogManager({businessId,role,skuPrefix}:{businessId:string;ro
         <label className="formField">SKU Otomatis<input className="autoCodeInput" value={editing?.sku??`${prefix}-XXXXXX`} readOnly/><span className="formHint">{editing?"SKU dikunci agar histori transaksi tetap konsisten.":`Nomor dibuat otomatis saat disimpan. Prefix ${prefix} dapat diubah di Pengaturan Usaha.`}</span></label>
         <label className="formField">Satuan<input value={form.unit} onChange={e=>setForm({...form,unit:e.target.value})} placeholder="pcs, box, jam"/></label>
         <label className="formField">Harga<input inputMode="numeric" value={form.price} onChange={e=>setForm({...form,price:e.target.value})}/></label>
+        <label className="formField">Kategori<input value={form.category} onChange={e=>setForm({...form,category:e.target.value})} placeholder="Katering, Snack, Jasa..."/></label>
         <label className="formField full">Deskripsi<textarea value={form.description} onChange={e=>setForm({...form,description:e.target.value})}/></label>
         <label className="checkboxField full"><input type="checkbox" checked={form.is_active} onChange={e=>setForm({...form,is_active:e.target.checked})}/>Aktif di katalog</label>
       </div>
