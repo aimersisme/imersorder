@@ -3892,7 +3892,7 @@ begin
     into v_settings
   from public.business_settings
   where business_id = v_business.id
-    and key in ('catalog_description','catalog_show_prices','catalog_accept_orders','appearance_theme');
+    and key in ('catalog_description','catalog_show_prices','catalog_accept_orders','appearance_theme','promo_popup','promo_marquee');
 
   select coalesce(jsonb_agg(jsonb_build_object(
     'id',id,'name',name,'sku',sku,'unit',unit,'price',price,
@@ -4025,6 +4025,12 @@ select id,'catalog_show_prices','{"enabled":true}'::jsonb from public.businesses
 on conflict (business_id,key) do nothing;
 insert into public.business_settings(business_id,key,value)
 select id,'catalog_accept_orders','{"enabled":true}'::jsonb from public.businesses
+on conflict (business_id,key) do nothing;
+insert into public.business_settings(business_id,key,value)
+select id,'promo_popup','{"enabled":false,"title":"Promo & Pengumuman","text":"Ada promo terbaru untuk pelanggan Anda.","button":"Lihat Promo","url":"","delay_seconds":3}'::jsonb from public.businesses
+on conflict (business_id,key) do nothing;
+insert into public.business_settings(business_id,key,value)
+select id,'promo_marquee','{"enabled":false,"text":"🔥 Promo terbaru tersedia — klik untuk melihat detail.","url":""}'::jsonb from public.businesses
 on conflict (business_id,key) do nothing;
 
 -- iMersOrder r16 public catalog included above via migration 202609240004_public_catalog.sql
