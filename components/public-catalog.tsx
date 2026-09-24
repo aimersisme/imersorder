@@ -1,8 +1,10 @@
 "use client";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Search, ShoppingBag, Share2, Plus, Minus, CheckCircle2, ArrowLeft } from "lucide-react";
 import { createClient } from "@/lib/supabase/browser";
 import { formatIDR } from "@/lib/format";
+import { applyThemeToDocument } from "@/lib/theme-client";
+import { normalizeThemeSettings } from "@/lib/themes";
 
 type Item={id:string;name:string;sku?:string|null;unit:string;price:number|string;description?:string|null;category:string};
 type Field={id:string;key:string;label:string;type:string;help_text?:string|null;placeholder?:string|null;required:boolean;sort_order:number;options:{id:string;label:string;value:string}[]};
@@ -13,6 +15,10 @@ const settingEnabled=(settings:Record<string,any>,key:string,def:boolean)=>setti
 const settingText=(settings:Record<string,any>,key:string,def:string)=>settings?.[key]?.text ?? def;
 
 export function PublicCatalog({data}:{data:Data}){
+  useEffect(() => {
+    const raw = data.settings?.appearance_theme;
+    if (raw) applyThemeToDocument(normalizeThemeSettings(raw), false);
+  }, [data.settings]);
   const supabase=useMemo(()=>createClient(),[]); const [q,setQ]=useState(""); const [category,setCategory]=useState("Semua"); const [cart,setCart]=useState<CartItem[]>([]); const [showCart,setShowCart]=useState(false); const [showForm,setShowForm]=useState(false); const [sent,setSent]=useState<{order_number:string;total:number}|null>(null); const [saving,setSaving]=useState(false); const [error,setError]=useState("");
   const [form,setForm]=useState<Record<string,string>>({name:"",whatsapp:"",email:"",address:"",expected_date:"",note:""});
   const categories=useMemo(()=>["Semua",...Array.from(new Set(data.items.map(i=>i.category).filter(Boolean)))],[data.items]);
