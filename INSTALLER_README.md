@@ -92,3 +92,9 @@ For an existing installation, run only `supabase/migrations/202609240006_brandin
 
 ### r19 demo-data migration
 For an existing installation that wants the new onboarding option, run `supabase/migrations/202609240007_demo_data_option.sql` once. It adds the optional demo-data flag to business creation. It does not seed existing businesses automatically.
+
+### r20 — Existing business demo seed
+
+For an existing Catering business, run `supabase/migrations/202609240008_seed_demo_existing_business.sql`, deploy r20, then open Pengaturan Usaha and choose **Isi Data Contoh Katering**. This adds 10 customers, 3 receivables, and 6 Catering products to the current business. The action is Owner-only and idempotent.
+
+For a new installation, `supabase/iMersOrder_MASTER_FULL_v1.0.sql` already contains the same RPC, so the migration is not required.
