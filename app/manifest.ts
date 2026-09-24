@@ -21,6 +21,12 @@ async function getBranding() {
 export default async function manifest(): Promise<MetadataRoute.Manifest> {
   const branding = await getBranding();
   const name = String(branding?.name ?? "iMersOrder");
+  const logoUrl = String(branding?.logo_url ?? "");
+  const faviconUrl = String(branding?.favicon_url ?? "");
+  const useLogo = Boolean(branding?.use_logo_as_favicon ?? true);
+  const activeIcon = (!useLogo && faviconUrl) ? faviconUrl : logoUrl;
+  const iconVersion = activeIcon.match(/[?&]v=([^&]+)/)?.[1] ?? "27";
+  const iconQuery = `?size=512&v=${encodeURIComponent(iconVersion)}`;
 
   return {
     name,
@@ -31,8 +37,8 @@ export default async function manifest(): Promise<MetadataRoute.Manifest> {
     background_color: "#f5f7f4",
     theme_color: "#07864f",
     icons: [
-      { src: "/api/pwa/icon?size=192", sizes: "any", purpose: "any" },
-      { src: "/api/pwa/icon?size=512", sizes: "any", purpose: "maskable" },
+      { src: `/api/pwa/icon?size=192&v=${encodeURIComponent(iconVersion)}`, sizes: "192x192", purpose: "any" },
+      { src: `/api/pwa/icon${iconQuery}`, sizes: "512x512", purpose: "maskable any" },
     ],
   };
 }

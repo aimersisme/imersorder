@@ -29,6 +29,6 @@ export default async function MorePage() {
       {menus.map(([Icon,title,desc,href]) => <Link className="menuRow" href={href} key={title}><Icon size={20}/><span><strong>{title}</strong><small>{desc}</small></span><ChevronRight size={18}/></Link>)}
     </section>
     <section className="menuPanel"><LogoutButton /></section>
-    <div className="buildNote"><strong>iMersOrder v1.0.0-r26</strong><span>CRUD ✓ · Quick Customer ✓ · Auto SKU ✓ · 10 Tema ✓ · Hutang & Piutang Pribadi ✓</span></div>
+    <div className="buildNote"><strong>iMersOrder v1.0.0-r27</strong><span>CRUD ✓ · Quick Customer ✓ · Auto SKU ✓ · 10 Tema ✓ · Hutang & Piutang Pribadi ✓</span></div>
   </AppShell>;
 }

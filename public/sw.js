@@ -1,4 +1,4 @@
-const CACHE_VERSION = "imersorder-branding-v024";
+const CACHE_VERSION = "imersorder-branding-v027";
 self.addEventListener("install", () => self.skipWaiting());
 self.addEventListener("activate", (event) => {
   event.waitUntil((async () => {

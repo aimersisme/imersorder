@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Plus, Shuffle, Trash2, Upload, Image as ImageIcon, X, ShoppingBag } from "lucide-react";
 import { createClient } from "@/lib/supabase/browser";
 import { FormActions, ModuleHeader, Notice } from "@/components/crud-ui";
+import { MediaPicker } from "@/components/media-picker";
 import {
   DEFAULT_DASHBOARD_QUOTES,
   normalizeDashboardMotivation,
@@ -51,6 +52,7 @@ export function BusinessSettingsManager({ businessId, role }: { businessId: stri
   const [useLogoAsFavicon, setUseLogoAsFavicon] = useState(true);
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [uploadingFavicon, setUploadingFavicon] = useState(false);
+  const [uploadingPromoImage, setUploadingPromoImage] = useState(false);
   const [logoPreviewError, setLogoPreviewError] = useState(false);
   const [faviconPreviewError, setFaviconPreviewError] = useState(false);
   const [autoReminder, setAutoReminder] = useState(false);
@@ -66,6 +68,9 @@ export function BusinessSettingsManager({ businessId, role }: { businessId: stri
   const [promoPopupButton, setPromoPopupButton] = useState("Lihat Promo");
   const [promoPopupUrl, setPromoPopupUrl] = useState("");
   const [promoPopupDelay, setPromoPopupDelay] = useState(3);
+  const [promoPopupImageUrl, setPromoPopupImageUrl] = useState<string | null>(null);
+  const [promoImagePreviewError, setPromoImagePreviewError] = useState(false);
+  const [mediaPicker, setMediaPicker] = useState<"logo" | "favicon" | "promo" | null>(null);
   const [promoMarqueeEnabled, setPromoMarqueeEnabled] = useState(false);
   const [promoMarqueeText, setPromoMarqueeText] = useState("🔥 Promo terbaru tersedia — klik untuk melihat detail.");
   const [promoMarqueeUrl, setPromoMarqueeUrl] = useState("");
@@ -122,6 +127,8 @@ export function BusinessSettingsManager({ businessId, role }: { businessId: stri
         if (row.key === "catalog_accept_orders") setCatalogAcceptOrders(Boolean((row.value as Record<string, unknown>)?.enabled ?? true));
         if (row.key === "promo_popup") {
           const v = (row.value ?? {}) as Record<string, unknown>;
+          setPromoPopupImageUrl(String(v.image_url ?? "") || null);
+          setPromoImagePreviewError(false);
           setPromoPopupEnabled(Boolean(v.enabled));
           setPromoPopupTitle(String(v.title ?? "Promo & Pengumuman"));
           setPromoPopupText(String(v.text ?? "Ada promo terbaru untuk pelanggan Anda."));
@@ -164,9 +171,9 @@ export function BusinessSettingsManager({ businessId, role }: { businessId: stri
     setMotivationEnabled(true);
   }
 
-  async function uploadBrandAsset(kind: "logo" | "favicon", file: File) {
+  async function uploadBrandAsset(kind: "logo" | "favicon" | "promo", file: File) {
     if (!canOwner) return;
-    const setter = kind === "logo" ? setUploadingLogo : setUploadingFavicon;
+    const setter = kind === "logo" ? setUploadingLogo : kind === "favicon" ? setUploadingFavicon : setUploadingPromoImage;
     setter(true);
     setMsg(null);
     try {
@@ -202,14 +209,31 @@ export function BusinessSettingsManager({ businessId, role }: { businessId: stri
         if (!savedUrl) throw new Error("Logo berhasil di-upload tetapi belum tersimpan di data usaha.");
         setLogoUrl(savedUrl);
         setLogoPreviewError(false);
-      } else {
+      } else if (kind === "favicon") {
         const { error } = await supabase.from("business_settings").upsert({ business_id: businessId, key: "favicon_url", value: { url } }, { onConflict: "business_id,key" });
         if (error) throw error;
         setFaviconUrl(url);
         setFaviconPreviewError(false);
+      } else {
+        const { error } = await supabase.from("business_settings").upsert({
+          business_id: businessId,
+          key: "promo_popup",
+          value: {
+            enabled: promoPopupEnabled,
+            title: promoPopupTitle.trim(),
+            text: promoPopupText.trim(),
+            button: promoPopupButton.trim(),
+            url: safeExternalUrl(promoPopupUrl),
+            delay_seconds: Math.min(15, Math.max(0, Number(promoPopupDelay) || 0)),
+            image_url: url,
+          },
+        }, { onConflict: "business_id,key" });
+        if (error) throw error;
+        setPromoPopupImageUrl(url);
+        setPromoImagePreviewError(false);
       }
-      window.dispatchEvent(new CustomEvent("imersorder:branding-updated", { detail: { logoUrl: kind === "logo" ? url : logoUrl, faviconUrl: kind === "favicon" ? url : faviconUrl } }));
-      setMsg({ kind: "success", text: `${kind === "logo" ? "Logo" : "Favicon"} berhasil diperbarui.` });
+      window.dispatchEvent(new CustomEvent("imersorder:branding-updated", { detail: { logoUrl: kind === "logo" ? url : logoUrl, faviconUrl: kind === "favicon" ? url : faviconUrl, promoImageUrl: kind === "promo" ? url : promoPopupImageUrl } }));
+      setMsg({ kind: "success", text: `${kind === "logo" ? "Logo" : kind === "favicon" ? "Favicon" : "Gambar popup"} berhasil diperbarui.` });
     } catch (e) {
       const err = e as { message?: string; details?: string; hint?: string; code?: string; statusCode?: string | number };
       const detail = [err?.message, err?.details, err?.hint].filter(Boolean).join(" — ");
@@ -218,6 +242,51 @@ export function BusinessSettingsManager({ businessId, role }: { businessId: stri
     } finally {
       setter(false);
     }
+  }
+
+  async function selectBrandMedia(kind: "logo" | "favicon" | "promo", url: string) {
+    if (!canOwner) return;
+    setMsg(null);
+    try {
+      if (kind === "logo") {
+        const { error } = await supabase.from("businesses").update({ logo_url: url }).eq("id", businessId);
+        if (error) throw error;
+        setLogoUrl(url); setLogoPreviewError(false);
+      } else if (kind === "favicon") {
+        const { error } = await supabase.from("business_settings").upsert({ business_id: businessId, key: "favicon_url", value: { url } }, { onConflict: "business_id,key" });
+        if (error) throw error;
+        setFaviconUrl(url); setFaviconPreviewError(false);
+      } else {
+        const { error } = await supabase.from("business_settings").upsert({
+          business_id: businessId, key: "promo_popup", value: {
+            enabled: promoPopupEnabled, title: promoPopupTitle.trim(), text: promoPopupText.trim(), button: promoPopupButton.trim(),
+            url: safeExternalUrl(promoPopupUrl), delay_seconds: Math.min(15, Math.max(0, Number(promoPopupDelay) || 0)), image_url: url,
+          },
+        }, { onConflict: "business_id,key" });
+        if (error) throw error;
+        setPromoPopupImageUrl(url); setPromoImagePreviewError(false);
+      }
+      window.dispatchEvent(new CustomEvent("imersorder:branding-updated", { detail: { logoUrl: kind === "logo" ? url : logoUrl, faviconUrl: kind === "favicon" ? url : faviconUrl, promoImageUrl: kind === "promo" ? url : promoPopupImageUrl } }));
+      setMediaPicker(null);
+      setMsg({ kind: "success", text: `${kind === "logo" ? "Logo" : kind === "favicon" ? "Favicon" : "Gambar popup"} berhasil dipilih dari Media.` });
+    } catch (e) {
+      const err = e as { message?: string };
+      setMsg({ kind: "error", text: err?.message || "Gagal menggunakan media." });
+    }
+  }
+
+  async function removePromoImage() {
+    if (!canOwner) return;
+    setMsg(null);
+    const current = {
+      enabled: promoPopupEnabled, title: promoPopupTitle.trim(), text: promoPopupText.trim(), button: promoPopupButton.trim(),
+      url: safeExternalUrl(promoPopupUrl), delay_seconds: Math.min(15, Math.max(0, Number(promoPopupDelay) || 0)), image_url: null,
+    };
+    const { error } = await supabase.from("business_settings").upsert({ business_id: businessId, key: "promo_popup", value: current }, { onConflict: "business_id,key" });
+    if (error) return setMsg({ kind: "error", text: error.message });
+    setPromoPopupImageUrl(null);
+    setPromoImagePreviewError(false);
+    setMsg({ kind: "success", text: "Gambar popup dihapus." });
   }
 
   async function removeBrandAsset(kind: "logo" | "favicon") {
@@ -316,7 +385,7 @@ export function BusinessSettingsManager({ businessId, role }: { businessId: stri
           { business_id: businessId, key: "catalog_description", value: { text: catalogDescription.trim() } },
           { business_id: businessId, key: "catalog_show_prices", value: { enabled: catalogShowPrices } },
           { business_id: businessId, key: "catalog_accept_orders", value: { enabled: catalogAcceptOrders } },
-          { business_id: businessId, key: "promo_popup", value: { enabled: promoPopupEnabled, title: promoPopupTitle.trim(), text: promoPopupText.trim(), button: promoPopupButton.trim(), url: popupUrl, delay_seconds: Math.min(15, Math.max(0, Number(promoPopupDelay) || 0)) } },
+          { business_id: businessId, key: "promo_popup", value: { enabled: promoPopupEnabled, title: promoPopupTitle.trim(), text: promoPopupText.trim(), button: promoPopupButton.trim(), url: popupUrl, delay_seconds: Math.min(15, Math.max(0, Number(promoPopupDelay) || 0)), image_url: promoPopupImageUrl } },
           { business_id: businessId, key: "promo_marquee", value: { enabled: promoMarqueeEnabled, text: promoMarqueeText.trim(), url: marqueeUrl } },
           {
             business_id: businessId,
@@ -394,7 +463,7 @@ export function BusinessSettingsManager({ businessId, role }: { businessId: stri
             <div className="brandingPreview">{logoUrl && !logoPreviewError ? <img key={logoUrl} src={logoUrl} alt="Logo usaha" onError={() => setLogoPreviewError(true)} /> : <ImageIcon size={28} />}</div>
             <div className="brandingUploadCopy"><strong>Logo Usaha</strong><small>PNG, JPG, WEBP · maksimal 2 MB</small></div>
             {canOwner ? <div className="brandingActions">
-              <label className="miniButton primary"><Upload size={14} /> {uploadingLogo ? "Mengunggah..." : logoUrl ? "Ganti Logo" : "Upload Logo"}<input type="file" accept="image/png,image/jpeg,image/webp" hidden disabled={uploadingLogo} onChange={(e) => { const f=e.target.files?.[0]; if(f) void uploadBrandAsset("logo", f); e.currentTarget.value=""; }} /></label>
+              <button type="button" className="miniButton primary" disabled={!canOwner} onClick={() => setMediaPicker("logo")}><ImageIcon size={14} /> {logoUrl ? "Ganti / Pilih Logo" : "Pilih Logo"}</button>
               {logoUrl ? <button type="button" className="miniButton danger" onClick={() => void removeBrandAsset("logo")}><X size={14}/> Hapus</button> : null}
             </div> : null}
           </div>
@@ -402,7 +471,7 @@ export function BusinessSettingsManager({ businessId, role }: { businessId: stri
             <div className="brandingPreview faviconPreview">{faviconUrl && !faviconPreviewError ? <img key={faviconUrl} src={faviconUrl} alt="Favicon" onError={() => setFaviconPreviewError(true)} /> : <ImageIcon size={24} />}</div>
             <div className="brandingUploadCopy"><strong>Favicon</strong><small>Ikon tab browser/PWA · maksimal 2 MB</small></div>
             {canOwner ? <div className="brandingActions">
-              <label className="miniButton primary"><Upload size={14} /> {uploadingFavicon ? "Mengunggah..." : faviconUrl ? "Ganti Favicon" : "Upload Favicon"}<input type="file" accept="image/png,image/jpeg,image/webp,image/x-icon" hidden disabled={uploadingFavicon} onChange={(e) => { const f=e.target.files?.[0]; if(f) void uploadBrandAsset("favicon", f); e.currentTarget.value=""; }} /></label>
+              <button type="button" className="miniButton primary" disabled={!canOwner} onClick={() => setMediaPicker("favicon")}><ImageIcon size={14} /> {faviconUrl ? "Ganti / Pilih Favicon" : "Pilih Favicon"}</button>
               {faviconUrl ? <button type="button" className="miniButton danger" onClick={() => void removeBrandAsset("favicon")}><X size={14}/> Hapus</button> : null}
             </div> : null}
           </div>
@@ -457,6 +526,17 @@ export function BusinessSettingsManager({ businessId, role }: { businessId: stri
             <label className="formField"><span>Judul Popup</span><input value={promoPopupTitle} disabled={!canOwner} onChange={e=>setPromoPopupTitle(e.target.value)} maxLength={80} /></label>
             <label className="formField"><span>Teks Tombol</span><input value={promoPopupButton} disabled={!canOwner} onChange={e=>setPromoPopupButton(e.target.value)} maxLength={40} /></label>
             <label className="formField full"><span>Isi Popup</span><textarea value={promoPopupText} disabled={!canOwner} onChange={e=>setPromoPopupText(e.target.value)} maxLength={240} /></label>
+            <div className="formField full">
+              <span>Gambar / Banner Popup</span>
+              <div className="promoImageUploadRow">
+                {promoPopupImageUrl && !promoImagePreviewError ? <img className="promoImagePreview" src={promoPopupImageUrl} alt="Preview promo" onError={()=>setPromoImagePreviewError(true)} /> : <div className="promoImagePlaceholder"><ImageIcon size={20}/><span>Belum ada gambar</span></div>}
+                <div className="promoImageUploadActions">
+                  <button type="button" className="miniButton primary" disabled={!canOwner} onClick={() => setMediaPicker("promo")}><ImageIcon size={14}/> {promoPopupImageUrl ? "Ganti / Pilih Gambar" : "Pilih Gambar"}</button>
+                  {promoPopupImageUrl ? <button type="button" className="miniButton danger" disabled={!canOwner || uploadingPromoImage} onClick={()=>void removePromoImage()}><X size={14}/> Hapus</button> : null}
+                  <small>Media yang sudah pernah di-upload bisa dipakai kembali. Upload baru hanya jika belum tersedia. Media yang tidak digunakan bisa dihapus dari Media.</small>
+                </div>
+              </div>
+            </div>
             <label className="formField"><span>URL Tujuan</span><input type="url" value={promoPopupUrl} disabled={!canOwner} onChange={e=>setPromoPopupUrl(e.target.value)} placeholder="https://contoh.com/promo" /></label>
             <label className="formField"><span>Muncul Setelah (detik)</span><input type="number" min={0} max={15} value={promoPopupDelay} disabled={!canOwner} onChange={e=>setPromoPopupDelay(Number(e.target.value || 0))} /></label>
           </div>
@@ -577,6 +657,16 @@ export function BusinessSettingsManager({ businessId, role }: { businessId: stri
       {!canOwner ? (
         <Notice kind="info">Role Anda hanya dapat melihat pengaturan. Perubahan profil usaha khusus owner.</Notice>
       ) : null}
+      <MediaPicker
+        open={mediaPicker !== null}
+        businessId={businessId}
+        bucket="branding"
+        title={mediaPicker === "logo" ? "Pilih Logo dari Media" : mediaPicker === "favicon" ? "Pilih Favicon dari Media" : "Pilih Gambar Popup dari Media"}
+        currentUrl={mediaPicker === "logo" ? logoUrl : mediaPicker === "favicon" ? faviconUrl : promoPopupImageUrl}
+        accept={mediaPicker === "favicon" ? "image/png,image/jpeg,image/webp,image/x-icon" : "image/png,image/jpeg,image/webp"}
+        onClose={() => setMediaPicker(null)}
+        onSelect={(url) => { if (mediaPicker) void selectBrandMedia(mediaPicker, url); }}
+      />
     </>
   );
 }

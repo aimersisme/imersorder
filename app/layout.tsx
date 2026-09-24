@@ -7,13 +7,13 @@ export const metadata: Metadata = {
   title: "iMersOrder",
   description: "Katalog online, pesanan lebih teratur.",
   applicationName: "iMersOrder",
-  manifest: "/manifest.webmanifest?v=25",
+  manifest: "/manifest.webmanifest?v=27",
   icons: {
     icon: [
-      { url: "/api/pwa/icon?size=512", type: "image/png", sizes: "any" },
+      { url: "/api/pwa/icon?size=512&v=27", type: "image/png", sizes: "512x512" },
     ],
     apple: [
-      { url: "/api/pwa/icon?size=512", type: "image/png", sizes: "any" },
+      { url: "/api/pwa/icon?size=512&v=27", type: "image/png", sizes: "512x512" },
     ],
   },
 };
