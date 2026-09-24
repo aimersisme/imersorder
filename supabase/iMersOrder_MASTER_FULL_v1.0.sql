@@ -3767,7 +3767,7 @@ begin
     into v_settings
   from public.business_settings
   where business_id = v_business.id
-    and key in ('catalog_description','catalog_show_prices','catalog_accept_orders');
+    and key in ('catalog_description','catalog_show_prices','catalog_accept_orders','appearance_theme');
 
   select coalesce(jsonb_agg(jsonb_build_object(
     'id',id,'name',name,'sku',sku,'unit',unit,'price',price,
