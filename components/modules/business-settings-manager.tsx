@@ -218,7 +218,7 @@ export function BusinessSettingsManager({ businessId, role }: { businessId: stri
 
   async function seedExistingDemo() {
     if (!canOwner || templateSlug !== "catering") return;
-    if (!window.confirm("Isi usaha ini dengan data contoh Katering: 10 pelanggan, 3 piutang, dan 6 produk? Data contoh akan ditambahkan dan tidak akan diulang jika sudah pernah diisi.")) return;
+    if (!window.confirm("Isi usaha ini dengan data contoh Katering: 10 pelanggan, 6 produk, 10 transaksi, invoice, pembayaran, dan piutang? Data contoh akan ditambahkan dan tidak akan diulang jika sudah pernah diisi.")) return;
     setSeedingDemo(true);
     setMsg(null);
     const { data, error } = await supabase.rpc("seed_catering_demo_data", { p_business_id: businessId });
@@ -232,7 +232,7 @@ export function BusinessSettingsManager({ businessId, role }: { businessId: stri
       setMsg({ kind: "success", text: "Data contoh Katering sudah pernah ditambahkan ke usaha ini." });
       return;
     }
-    setMsg({ kind: "success", text: "Data contoh berhasil ditambahkan: 10 pelanggan, 3 piutang, dan 6 produk Katering." });
+    setMsg({ kind: "success", text: "Data contoh berhasil ditambahkan: 10 pelanggan, 6 produk, dan 10 transaksi Katering lengkap dengan invoice, pembayaran, dan sisa piutang." });
     setTimeout(() => window.location.reload(), 700);
   }
 
@@ -381,7 +381,7 @@ export function BusinessSettingsManager({ businessId, role }: { businessId: stri
             <button type="button" className="miniButton primary" onClick={() => void seedExistingDemo()} disabled={seedingDemo}>
               {seedingDemo ? "Menambahkan data..." : "Isi Data Contoh Katering"}
             </button>
-            <div className="formHint" style={{ marginTop: 8 }}>10 pelanggan · 3 piutang · 6 produk. Data demo hanya bisa di-seed sekali untuk usaha ini.</div>
+            <div className="formHint" style={{ marginTop: 8 }}>10 pelanggan · 6 produk · 10 transaksi · invoice · pembayaran · sisa piutang. Data demo hanya bisa di-seed sekali untuk usaha ini.</div>
           </div>
         ) : null}
 

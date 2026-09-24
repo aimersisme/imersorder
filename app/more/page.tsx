@@ -24,11 +24,11 @@ export default async function MorePage() {
   const business = await getActiveBusiness();
   return <AppShell>
     <header className="pageHeader"><div><h1>Lainnya</h1><p>{business.name} · akses sebagai {business.role}</p></div></header>
-    <div className="quickLinks" style={{marginBottom:14}}><Link className="quickLink" href="/reports"><strong>Laporan</strong><small>Ringkasan + ekspor CSV</small></Link><Link className="quickLink" href="/orders/new"><strong>Catat Order</strong><small>Order + invoice + DP</small></Link></div>
+    <div className="quickLinks" style={{marginBottom:14}}><Link className="quickLink" href="/reports"><strong>Laporan</strong><small>PDF/CSV · periode tanggal & bulan</small></Link><Link className="quickLink" href="/orders/new"><strong>Catat Order</strong><small>Order + invoice + DP</small></Link></div>
     <section className="menuPanel">
       {menus.map(([Icon,title,desc,href]) => <Link className="menuRow" href={href} key={title}><Icon size={20}/><span><strong>{title}</strong><small>{desc}</small></span><ChevronRight size={18}/></Link>)}
     </section>
     <section className="menuPanel"><LogoutButton /></section>
-    <div className="buildNote"><strong>iMersOrder v0.2.11-r7</strong><span>CRUD ✓ · Quick Customer ✓ · Auto SKU ✓ · 10 Tema ✓ · Hutang & Piutang ✓</span></div>
+    <div className="buildNote"><strong>iMersOrder v1.0.0-r23</strong><span>CRUD ✓ · Quick Customer ✓ · Auto SKU ✓ · 10 Tema ✓ · Hutang & Piutang ✓</span></div>
   </AppShell>;
 }

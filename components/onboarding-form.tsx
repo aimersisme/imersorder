@@ -73,7 +73,7 @@ export function OnboardingForm() {
               <input type="checkbox" checked={seedDemo} onChange={(e) => setSeedDemo(e.target.checked)} />
               <span>
                 <strong>Gunakan data contoh Katering</strong>
-                <small>Isi otomatis 10 pelanggan, 3 piutang, dan 6 produk catering. Bisa dihapus atau diedit setelah masuk.</small>
+                <small>Isi otomatis 10 pelanggan, 6 produk, 10 transaksi, invoice, pembayaran, dan sisa piutang. Bisa dihapus atau diedit setelah masuk.</small>
               </span>
             </label>
           )}
