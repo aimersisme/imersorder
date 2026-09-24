@@ -3580,7 +3580,7 @@ using (
     where bm.user_id = auth.uid() and bm.role = 'owner' and bm.status = 'active'
   )
 );
--- iMersOrder r15: Public Catalog ON/OFF + public catalog/order flow
+-- iMersOrder r16: Public Catalog ON/OFF + public catalog/order flow
 alter table public.catalog_items
   add column if not exists category text;
 
@@ -3755,4 +3755,4 @@ insert into public.business_settings(business_id,key,value)
 select id,'catalog_accept_orders','{"enabled":true}'::jsonb from public.businesses
 on conflict (business_id,key) do nothing;
 
--- iMersOrder r15 public catalog included above via migration 202609240004_public_catalog.sql
+-- iMersOrder r16 public catalog included above via migration 202609240004_public_catalog.sql

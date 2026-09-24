@@ -1,4 +1,4 @@
-# iMersOrder v1.0.0-r15 — Public Catalog
+# iMersOrder v1.0.0-r16 — Public Catalog
 
 - Katalog Online can be switched ON/OFF from Pengaturan Usaha.
 - ON: `/` becomes the public catalog without login.
