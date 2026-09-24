@@ -1,4 +1,4 @@
-# iMersOrder v1.0.0-r12 — FULL CLIENT INSTALLER
+# iMersOrder v1.0.0-r18 — FULL CLIENT INSTALLER
 
 ## Fresh Client / Single Install
 
@@ -76,3 +76,7 @@ Token Fonnte / API Key Starsender sekarang diisi langsung dari menu **Integrasi 
 
 ### WhatsApp v1.0.0-r12
 Normal WhatsApp sends use the signed-in Supabase session and a protected RPC to read the business provider credential. `SUPABASE_SERVICE_ROLE_KEY` is not required for normal WhatsApp sends; keep it only for server/background tasks such as scheduled reminders.
+
+
+### r18 branding migration
+For an existing installation, run only `supabase/migrations/202609240006_branding_everywhere.sql`. Do not rerun the master SQL. This makes the uploaded logo available on login and on public invoice print/save-to-PDF.

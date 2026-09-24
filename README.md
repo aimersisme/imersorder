@@ -1,4 +1,4 @@
-# iMersOrder v1.0.0-r12 — Single Install + Optional WhatsApp Auto Reminder
+# iMersOrder v1.0.0-r18 — Single Install + Optional WhatsApp Auto Reminder
 
 Versi ini membawa seluruh fitur v0.2.7 Theme Engine, Quick Customer Order, Team Role Guide, Auto SKU, CRUD, performance/runtime fixes, lalu menambahkan personalisasi dashboard dan modul Hutang & Piutang standalone.
 
